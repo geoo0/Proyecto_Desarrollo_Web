@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: siglad-auth
+    env: node
+    plan: free
+    buildCommand: |
+      npm ci
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false   # En Render, puedes enlazar la DB y usar fromDatabase en su UI
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES
+        value: 2h
+      - key: BCRYPT_SALT_ROUNDS
+        value: 10
+      - key: APP_NAME
+        value: SIGLAD
+      - key: DB_SSL_REJECT_UNAUTHORIZED
+        value: "false"
