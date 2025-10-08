@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <title>SIGLAD – Gestión de Usuarios</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-expand-lg bg-body-tertiary">
+    <div class="container">
+      <a class="navbar-brand" href="#">SIGLAD</a>
+      <div class="d-flex gap-2">
+        <button id="btn-logout" class="btn btn-outline-secondary btn-sm">Salir</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container py-4">
+    <div id="guard" class="alert alert-warning d-none">Verificando permisos...</div>
+
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h3 class="m-0">Gestión de Usuarios</h3>
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createModal">Nuevo usuario</button>
+    </div>
+
+    <form class="row g-2 mb-3" id="searchForm">
+      <div class="col-md-4">
+        <input class="form-control" id="search" placeholder="Buscar por nombre o correo">
+      </div>
+      <div class="col-md-3">
+        <select class="form-select" id="onlyActive">
+          <option value="">Todos</option>
+          <option value="true">Solo activos</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select class="form-select" id="pageSize">
+          <option>10</option><option>20</option><option>50</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <button class="btn btn-outline-primary w-100" type="submit">Aplicar filtros</button>
+      </div>
+    </form>
+
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Nombre</th>
+            <th>Correo</th>
+            <th>Rol</th>
+            <th>Activo</th>
+            <th>Creado</th>
+            <th class="text-end">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center">
+      <div id="totalLabel" class="text-muted small"></div>
+      <nav>
+        <ul class="pagination pagination-sm mb-0" id="pager"></ul>
+      </nav>
+    </div>
+  </div>
+
+  <!-- Modal crear -->
+  <div class="modal fade" id="createModal" tabindex="-1">
+    <div class="modal-dialog">
+      <form class="modal-content" id="createForm">
+        <div class="modal-header">
+          <h5 class="modal-title">Nuevo usuario</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body g-3">
+          <div class="mb-2">
+            <label class="form-label">Nombre</label>
+            <input class="form-control" id="c_name" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Correo</label>
+            <input type="email" class="form-control" id="c_email" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Rol</label>
+            <select class="form-select" id="c_role" required>
+              <option value="ADMIN">ADMIN</option>
+              <option value="TRANSPORTISTA">TRANSPORTISTA</option>
+              <option value="AGENTE">AGENTE</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Contraseña</label>
+            <input type="password" class="form-control" id="c_password" minlength="8" required>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" id="c_active" type="checkbox" checked>
+            <label class="form-check-label" for="c_active">Activo</label>
+          </div>
+          <div id="createMsg" class="small text-muted mt-2"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
+          <button class="btn btn-primary" type="submit">Crear</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.location.href = '/login.html';
+    }
+
+    // Guard de rol ADMIN
+    async function guardAdmin(){
+      const guard = document.getElementById('guard');
+      guard.classList.remove('d-none');
+      guard.textContent = 'Verificando permisos...';
+      try {
+        const r = await fetch('/api/auth/me', { headers: { Authorization: 'Bearer ' + token } });
+        const data = await r.json();
+        const role = data?.data?.user?.role;
+        if (role !== 'ADMIN') {
+          guard.classList.remove('alert-warning');
+          guard.classList.add('alert-danger');
+          guard.textContent = 'Acceso restringido. Se requiere rol ADMIN.';
+          throw new Error('forbidden');
+        }
+        guard.classList.add('d-none');
+      } catch {
+        setTimeout(() => window.location.href = '/login.html', 1000);
+      }
+    }
+
+    // Estado global de paginación/filtros
+    let state = { page: 1, pageSize: 10, search: '', onlyActive: '' };
+
+    async function fetchUsers(){
+      const params = new URLSearchParams({
+        page: state.page,
+        pageSize: state.pageSize,
+        search: state.search || '',
+        onlyActive: state.onlyActive || ''
+      }).toString();
+
+      const r = await fetch('/api/users?' + params, {
+        headers: { Authorization: 'Bearer ' + token }
+      });
+      const payload = await r.json();
+      if (!r.ok) throw new Error(payload?.error || 'Error cargando usuarios');
+      renderTable(payload.users || []);
+      renderPager(payload.total || 0);
+    }
+
+    function renderTable(rows){
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = '';
+      for (const u of rows) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(u.name)}</td>
+          <td>${escapeHtml(u.email)}</td>
+          <td><span class="badge bg-secondary">${u.role}</span></td>
+          <td>${u.is_active ? 'Sí' : 'No'}</td>
+          <td>${new Date(u.created_at).toLocaleString()}</td>
+          <td class="text-end">
+            <div class="btn-group btn-group-sm">
+              <button class="btn btn-outline-secondary" onclick="toggleActive('${u.id}', ${u.is_active})">${u.is_active ? 'Desactivar' : 'Activar'}</button>
+              <button class="btn btn-outline-danger" onclick="removeUser('${u.id}')">Eliminar</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      }
+      document.getElementById('totalLabel').textContent = `Mostrando ${rows.length} usuario(s)`;
+    }
+
+    function renderPager(total){
+      const pager = document.getElementById('pager');
+      pager.innerHTML = '';
+      const pages = Math.max(1, Math.ceil(total / state.pageSize));
+      const mk = (p, label = p, active = (p === state.page)) => {
+        const li = document.createElement('li');
+        li.className = 'page-item' + (active ? ' active' : '');
+        const a = document.createElement('a');
+        a.className = 'page-link';
+        a.href = '#';
+        a.textContent = label;
+        a.onclick = (e) => { e.preventDefault(); state.page = p; fetchUsers(); };
+        li.appendChild(a);
+        return li;
+      };
+      for (let p = 1; p <= pages; p++) pager.appendChild(mk(p));
+    }
+
+    async function toggleActive(id, current){
+      const body = { is_active: !current };
+      const r = await fetch('/api/users/' + id, {
+        method: 'PUT',
+        headers: {
+          'Content-Type':'application/json',
+          Authorization: 'Bearer ' + token
+        },
+        body: JSON.stringify(body)
+      });
+      const data = await r.json();
+      if (!r.ok) return alert(data?.error || 'Error actualizando');
+      fetchUsers();
+    }
+
+    async function removeUser(id){
+      if (!confirm('¿Eliminar este usuario? (soft delete)')) return;
+      const r = await fetch('/api/users/' + id, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer ' + token }
+      });
+      const data = await r.json();
+      if (!r.ok) return alert(data?.error || 'Error eliminando');
+      fetchUsers();
+    }
+
+    // Crear usuario (modal)
+    document.getElementById('createForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById('createMsg');
+      msg.textContent = 'Creando...';
+
+      const payload = {
+        name: document.getElementById('c_name').value,
+        email: document.getElementById('c_email').value,
+        role: document.getElementById('c_role').value,
+        is_active: document.getElementById('c_active').checked,
+        password: document.getElementById('c_password').value
+      };
+
+      const r = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify(payload)
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        msg.textContent = data?.error || 'Error creando';
+        msg.className = 'small text-danger';
+        return;
+      }
+      msg.textContent = 'Creado ✓';
+      msg.className = 'small text-success';
+      // cerrar modal y refrescar
+      setTimeout(() => {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('createModal'));
+        modal.hide();
+        e.target.reset();
+        msg.textContent = '';
+        fetchUsers();
+      }, 600);
+    });
+
+    // Filtros
+    document.getElementById('searchForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      state.search = document.getElementById('search').value.trim();
+      state.onlyActive = document.getElementById('onlyActive').value;
+      state.pageSize = Number(document.getElementById('pageSize').value || 10);
+      state.page = 1;
+      fetchUsers();
+    });
+
+    document.getElementById('btn-logout').addEventListener('click', () => {
+      localStorage.removeItem('token');
+      window.location.href = '/login.html';
+    });
+
+    function escapeHtml(s=''){ return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+    // bootstrap
+    guardAdmin().then(fetchUsers);
+  </script>
+</body>
+</html>
