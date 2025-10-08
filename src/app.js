@@ -1,3 +1,4 @@
+// src/app.js
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -11,7 +12,9 @@ import { pool } from './db/pool.js';
 
 const app = express();
 
-app.use(helmet());
+// 🔓 Helmet sin CSP (solo para PRUEBAS). Evita bloqueos de inline scripts/CDN.
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+
 app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
