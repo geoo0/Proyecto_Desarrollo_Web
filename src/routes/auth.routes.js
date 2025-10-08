@@ -1,11 +1,20 @@
 import { Router } from 'express';
-import { login, me } from '../controllers/auth.controller.js';
-import { validate, loginSchema } from '../validators/auth.validators.js';
-import { requireAuth } from '../middlewares/auth.js';
+import { requireAuth, requireRole } from '../middlewares/auth.js';
+import {
+  listUsers, createUser, updateUser, deleteUser
+} from '../controllers/users.controller.js';
+import {
+  validateCreateUser, validateUpdateUser, validateListQuery, validateIdParam
+} from '../validators/users.validators.js';
 
 const router = Router();
 
-router.post('/login', validate(loginSchema), login);
-router.get('/me', requireAuth, me);
+router.use(requireAuth, requireRole('ADMIN'));
+
+router.get('/', validateListQuery, listUsers);
+router.post('/', validateCreateUser, createUser);
+router.put('/:id', validateIdParam, validateUpdateUser, updateUser);
+router.delete('/:id', validateIdParam, deleteUser);
 
 export default router;
+
