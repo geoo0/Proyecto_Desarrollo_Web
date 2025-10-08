@@ -1,4 +1,4 @@
-import { findUserByEmail, insertAudit } from '../services/user.services.js';
+import { findUserByEmail, insertAudit } from '../services/user.service.js';
 import { compare } from '../utils/hash.js';
 import { signJwt } from '../utils/jwt.js';
 import { ok } from '../utils/response.js';
