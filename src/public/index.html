@@ -36,7 +36,10 @@
   </div>
 
   <script>
-    async function login(){
+  async function login(){
+    const out = document.getElementById('out');
+    out.textContent = '...enviando';
+    try {
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
       const res = await fetch('/api/auth/login',{
@@ -44,39 +47,35 @@
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({email,password})
       });
-      const data = await res.json();
-      document.getElementById('out').textContent = JSON.stringify(data,null,2);
 
-      if(data?.data?.token){
-        localStorage.setItem('token', data.data.token);
-        const me = await fetch('/api/auth/me',{headers:{Authorization:'Bearer '+data.data.token}});
-        const meData = await me.json();
-        document.getElementById('out').textContent += "\n\n/me => "+JSON.stringify(meData,null,2);
-      }
-    }
-  </script>
-  <script>
-  async function checkDB(){
-    const el = document.getElementById('dbStatus');
-    el.textContent = 'Verificando conexión a base de datos...';
-    try {
-      const res = await fetch('/api/debug/db');
       const data = await res.json();
-      if(res.ok && data?.ok){
-        el.textContent = '✅ Base de datos: conectada (' + (data.db?.ts || '') + ')';
-        el.className = 'text-center p-2 bg-success-subtle text-success-emphasis';
-      } else {
-        el.textContent = '⚠️ Base de datos: sin conexión';
-        el.className = 'text-center p-2 bg-warning-subtle text-warning-emphasis';
+      out.textContent = `status: ${res.status}\n` + JSON.stringify(data,null,2);
+
+      if(res.ok && data?.data?.token){
+        localStorage.setItem('token', data.data.token);
+
+        // Lee /me para saber el rol
+        const meRes = await fetch('/api/auth/me',{headers:{Authorization:'Bearer '+data.data.token}});
+        const me = await meRes.json();
+        out.textContent += `\n\n/me status: ${meRes.status}\n`+JSON.stringify(me,null,2);
+
+        const role = me?.data?.user?.role;
+        if (role === 'ADMIN') {
+          window.location.href = '/users.html';
+        } else if (role === 'TRANSPORTISTA') {
+          alert('Login ok (TRANSPORTISTA). Aquí redirigirías a /panel-transportista.html');
+        } else if (role === 'AGENTE') {
+          alert('Login ok (AGENTE). Aquí redirigirías a /panel-agente.html');
+        } else {
+          alert('Rol no reconocido. Permanece en esta página.');
+        }
       }
-    } catch (e) {
-      el.textContent = '❌ Error conectando a la base de datos: ' + e;
-      el.className = 'text-center p-2 bg-danger-subtle text-danger-emphasis';
+    } catch (err) {
+      out.textContent = 'Error de red: ' + err;
     }
   }
-
-  window.addEventListener('DOMContentLoaded', checkDB);
 </script>
 
+  
 </body>
 </html>
