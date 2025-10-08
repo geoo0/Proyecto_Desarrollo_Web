@@ -24,7 +24,7 @@
               <label class="form-label">Contraseña</label>
               <input id="password" type="password" class="form-control" value="Admin123*">
             </div>
-            <button class="btn btn-primary w-100" onclick="login()">Ingresar</button>
+            <button id="btnLogin" class="btn btn-primary w-100">Ingresar</button>
             <div class="mt-3">
               <pre id="out" class="small text-muted" style="white-space: pre-wrap;"></pre>
             </div>
@@ -36,6 +36,7 @@
   </div>
 
   <script>
+    document.getElementById("btnLogin").addEventListener("click", login);
   async function login(){
     const out = document.getElementById('out');
     out.textContent = '...enviando';
