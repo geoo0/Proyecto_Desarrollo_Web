@@ -1,6 +1,6 @@
 import * as svc from '../services/users.service.js';
 import { ok } from '../utils/response.js';
-import { insertAudit } from '../services/users.services.js'; // reutilizamos insertAudit del módulo 1
+import { insertAudit } from '../services/user.service.js'; // reutilizamos insertAudit del módulo 1
 import { hash } from '../utils/hash.js';
 
 export async function listUsers(req, res, next) {
