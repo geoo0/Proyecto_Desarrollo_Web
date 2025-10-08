@@ -2,9 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import authRoutes from './routes/auth.routes.js';
-import { errorHandler } from './middlewares/error.js';
+import path from 'path';
 
+import authRoutes from './routes/auth.routes.js';
+import usersRoutes from './routes/users.routes.js';
+import { errorHandler } from './middlewares/error.js';
 import { pool } from './db/pool.js';
 
 const app = express();
@@ -14,13 +16,13 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
-app.use(express.static('src/public'));
+// Servir estáticos con ruta absoluta (más robusto en Render)
+app.use(express.static(path.join(process.cwd(), 'src', 'public')));
 
+// Health
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, service: 'SIGLAD Auth', health: 'green' });
 });
-
-
 
 // Diagnóstico de DB
 app.get('/api/debug/db', async (req, res) => {
@@ -32,15 +34,11 @@ app.get('/api/debug/db', async (req, res) => {
   }
 });
 
-// ...
-import usersRoutes from './routes/users.routes.js';
-// ...
-app.use('/api/users', usersRoutes);
-// ...
-
-
+// Rutas API
 app.use('/api/auth', authRoutes);
+app.use('/api/users', usersRoutes);
 
+// Manejo de errores (al final)
 app.use(errorHandler);
 
 export default app;
