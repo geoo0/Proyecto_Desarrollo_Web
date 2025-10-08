@@ -32,6 +32,12 @@ app.get('/api/debug/db', async (req, res) => {
   }
 });
 
+// ...
+import usersRoutes from './routes/users.routes.js';
+// ...
+app.use('/api/users', usersRoutes);
+// ...
+
 
 app.use('/api/auth', authRoutes);
 
