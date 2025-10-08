@@ -1,6 +1,6 @@
 import { pool } from '../db/pool.js';
 
-// Solo exponemos campos públicos (sin password_hash)
+// Solo campos públicos
 const publicFields = `id, name, email, role, is_active, created_at, updated_at`;
 
 export async function listUsers({ page, pageSize, search, onlyActive }) {
